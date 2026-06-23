@@ -63,15 +63,35 @@ Despues del login navega al panel tecnico.
 
 ## Mock o provisional
 
-Actualmente el panel admin sigue usando datos mock:
+Actualmente el panel admin combina datos reales y mocks temporales.
+
+Conectado al backend:
+
+- `GET /rulebooks`
+
+La lista de rulebooks ya se consume desde el backend usando el JWT guardado por login.
+
+Campos disponibles actualmente desde API:
+
+- `id`
+- `crop_id`
+- `version`
+- `status`
+
+Campos que la UI marca como no expuestos:
+
+- cantidad de criterios
+- fecha de actualizacion
+- detalle completo por version
+
+Siguen usando mock:
 
 ```text
 src/features/admin/infrastructure/mock/adminData.ts
 ```
 
-Mocks incluidos:
+Mocks incluidos actualmente:
 
-- Rulebooks.
 - Documentos RAG.
 - Fragmentos RAG.
 - Estadisticas de administracion.
@@ -79,8 +99,9 @@ Mocks incluidos:
 
 Motivo:
 
-- El backend tiene codigo para rulebooks y documentos, pero esos servicios aun no estan listos como superficie estable para frontend.
-- Algunos endpoints existen en codigo, pero no conviene depender de ellos hasta confirmar que esten cableados en `main.py` y probados con datos reales.
+- Rulebooks ya esta conectado para listado.
+- Documentos/RAG y validaciones aun no tienen integracion frontend real.
+- Faltan endpoints o contratos estables para reemplazar esos mocks.
 
 ## Separacion realizada
 
@@ -109,9 +130,9 @@ El `package.json` fue renombrado a:
 
 Prioridad sugerida:
 
-- Confirmar endpoints reales para listar rulebooks.
 - Confirmar endpoint para crear/cargar rulebook.
 - Confirmar endpoint para publicar rulebook.
+- Exponer detalle por rulebook/version o criterio si la UI debe mostrar numero de criterios.
 - Confirmar endpoints de documentos.
 - Confirmar flujo de carga/indexacion RAG.
 - Definir contratos de respuesta para stats administrativas.

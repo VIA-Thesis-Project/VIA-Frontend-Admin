@@ -1,17 +1,100 @@
-import { useState } from 'react';
-import { Shield, Upload, RefreshCw, CheckCircle2, Clock, AlertTriangle, Database, BookOpen, FileText, Settings, Plus, Search, Filter } from 'lucide-react';
-import { adminNav, adminStats, ragDocs, rulebooks } from '@/features/admin/infrastructure/mock/adminData';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  BookOpen,
+  CheckCircle2,
+  Clock,
+  Database,
+  FileText,
+  Filter,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  Shield,
+  Upload,
+} from 'lucide-react';
 import { NavigateFn } from '@/app/navigation/navigation';
+import { RulebookSummary } from '@/features/admin/domain/rulebook';
+import { adminNav, ragDocs } from '@/features/admin/infrastructure/mock/adminData';
+import { RulebookApiRepository } from '@/features/admin/infrastructure/api/rulebookApiRepository';
+import { readAuthSession } from '@/features/auth/infrastructure/session/authSessionStorage';
 
 interface Props { navigate: NavigateFn; }
 
+const rulebookRepository = new RulebookApiRepository();
+
+const statusStyles: Record<string, { label: string; color: string; bg: string }> = {
+  ACTIVE: { label: 'Activo', color: '#16a34a', bg: '#dcfce7' },
+  DRAFT: { label: 'Borrador', color: '#7c3aed', bg: '#ede9fe' },
+  INACTIVE: { label: 'Inactivo', color: '#64748b', bg: '#f1f5f9' },
+};
+
+function cropLabel(cropId: string): string {
+  return cropId.replace(/^demo_/, '').replace(/_/g, ' ');
+}
+
+function getStatusStyle(status: string) {
+  return statusStyles[status.toUpperCase()] ?? { label: status, color: '#64748b', bg: '#f1f5f9' };
+}
 
 export default function Admin({ navigate }: Props) {
   const [activeTab, setActiveTab] = useState('rulebooks');
+  const [rulebooks, setRulebooks] = useState<RulebookSummary[]>([]);
+  const [search, setSearch] = useState('');
+  const [loadingRulebooks, setLoadingRulebooks] = useState(true);
+  const [rulebookError, setRulebookError] = useState<string | null>(null);
+
+  const loadRulebooks = async () => {
+    const session = readAuthSession();
+    if (!session) {
+      setRulebookError('Inicia sesion para consultar rulebooks.');
+      setLoadingRulebooks(false);
+      return;
+    }
+
+    setLoadingRulebooks(true);
+    setRulebookError(null);
+
+    try {
+      const result = await rulebookRepository.listRulebooks(session.accessToken);
+      setRulebooks(result);
+    } catch (err) {
+      setRulebookError(err instanceof Error ? err.message : 'No se pudo consultar la lista de rulebooks.');
+    } finally {
+      setLoadingRulebooks(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadRulebooks();
+  }, []);
+
+  const filteredRulebooks = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return rulebooks;
+    return rulebooks.filter((rulebook) => (
+      rulebook.cropId.toLowerCase().includes(query)
+      || String(rulebook.version).includes(query)
+      || rulebook.status.toLowerCase().includes(query)
+    ));
+  }, [rulebooks, search]);
+
+  const activeRulebooks = rulebooks.filter((rulebook) => rulebook.status.toUpperCase() === 'ACTIVE').length;
+  const draftRulebooks = rulebooks.filter((rulebook) => rulebook.status.toUpperCase() === 'DRAFT').length;
+  const navItems = adminNav.map((item) => (
+    item.id === 'rulebooks' ? { ...item, count: rulebooks.length } : item
+  ));
+
+  const stats = [
+    { icon: BookOpen, label: 'Rulebooks registrados', value: String(rulebooks.length), sub: `${activeRulebooks} activos, ${draftRulebooks} borradores`, color: '#16a34a', bg: '#f0fdf4', iconBg: '#dcfce7' },
+    { icon: FileText, label: 'Documentos indexados', value: '4', sub: 'mock hasta conectar documentos', color: '#0891b2', bg: '#ecfeff', iconBg: '#cffafe' },
+    { icon: Database, label: 'Fragmentos RAG', value: '365', sub: 'mock hasta conectar RAG', color: '#7c3aed', bg: '#faf5ff', iconBg: '#ede9fe' },
+    { icon: CheckCircle2, label: 'Validaciones pendientes', value: '3', sub: 'mock de panel tecnico', color: '#d97706', bg: '#fffbeb', iconBg: '#fef3c7' },
+  ];
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
-      {/* Admin sidebar */}
       <aside style={{ width: 240, background: '#0f172a', minHeight: '100vh', position: 'fixed', left: 0, top: 0, zIndex: 40, display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -19,18 +102,18 @@ export default function Admin({ navigate }: Props) {
               <Shield style={{ width: 18, height: 18, color: 'white' }} />
             </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>Panel técnico</div>
-              <div style={{ fontSize: 11, color: '#475569' }}>AgroViabilidad DSS</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>Panel tecnico</div>
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>AgroViabilidad DSS</div>
             </div>
           </div>
           <div style={{ marginTop: 12, background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 8, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Shield style={{ width: 11, height: 11, color: '#f87171' }} />
-            <span style={{ fontSize: 11, color: '#f87171', fontWeight: 600 }}>Acceso restringido · Admin</span>
+            <span style={{ fontSize: 11, color: '#f87171', fontWeight: 600 }}>Acceso restringido - Admin</span>
           </div>
         </div>
 
         <nav style={{ flex: 1, padding: '12px 10px' }}>
-          {adminNav.map(({ id, icon: Icon, label, count }) => (
+          {navItems.map(({ id, icon: Icon, label, count }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -63,28 +146,31 @@ export default function Admin({ navigate }: Props) {
         <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 30, height: 30, background: '#dc2626', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0 }}>
-              MA
+              AD
             </div>
             <div>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'white' }}>María Alvarez</div>
-              <div style={{ fontSize: 11, color: '#475569' }}>Administradora técnica</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'white' }}>Admin VIA</div>
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>Administracion tecnica</div>
             </div>
           </div>
         </div>
       </aside>
 
       <main style={{ marginLeft: 240, flex: 1, padding: '28px 32px', minWidth: 0 }}>
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fee2e2', color: '#dc2626', padding: '4px 12px', borderRadius: 20, fontSize: 11.5, fontWeight: 600, marginBottom: 10, border: '1px solid #fecaca' }}>
-              <Shield style={{ width: 12, height: 12 }} /> Acceso restringido al equipo técnico
+              <Shield style={{ width: 12, height: 12 }} /> Acceso restringido al equipo tecnico
             </div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: 0, marginBottom: 4 }}>Panel de administración técnica</h1>
-            <p style={{ fontSize: 13.5, color: '#64748b', margin: 0 }}>Gestión de rulebooks, documentos RAG, validaciones y configuración del sistema DSS.</p>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: 0, marginBottom: 4 }}>Panel de administracion tecnica</h1>
+            <p style={{ fontSize: 13.5, color: '#64748b', margin: 0 }}>Rulebooks conectados a backend. Documentos RAG y validaciones siguen como mock temporal.</p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button style={{ background: 'white', color: '#475569', border: '1.5px solid #e2e8f0', padding: '9px 14px', borderRadius: 9, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
+            <button
+              onClick={() => void loadRulebooks()}
+              disabled={loadingRulebooks}
+              style={{ background: 'white', color: '#475569', border: '1.5px solid #e2e8f0', padding: '9px 14px', borderRadius: 9, fontSize: 13.5, fontWeight: 600, cursor: loadingRulebooks ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}
+            >
               <RefreshCw style={{ width: 14, height: 14 }} /> Sincronizar
             </button>
             <button style={{ background: '#16a34a', color: 'white', border: 'none', padding: '9px 16px', borderRadius: 9, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -93,14 +179,8 @@ export default function Admin({ navigate }: Props) {
           </div>
         </div>
 
-        {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
-          {[
-            { icon: BookOpen, label: 'Rulebooks activos', value: '4', sub: '2 en revisión', color: '#16a34a', bg: '#f0fdf4', iconBg: '#dcfce7' },
-            { icon: FileText, label: 'Documentos indexados', value: '4', sub: '1 procesando, 1 error', color: '#0891b2', bg: '#ecfeff', iconBg: '#cffafe' },
-            { icon: Database, label: 'Fragmentos RAG', value: '365', sub: 'Listos para recuperación', color: '#7c3aed', bg: '#faf5ff', iconBg: '#ede9fe' },
-            { icon: CheckCircle2, label: 'Validaciones pendientes', value: '3', sub: 'Por experto agrónomo', color: '#d97706', bg: '#fffbeb', iconBg: '#fef3c7' },
-          ].map(({ icon: Icon, label, value, sub, color, bg, iconBg }) => (
+          {stats.map(({ icon: Icon, label, value, sub, color, iconBg }) => (
             <div key={label} style={{ background: 'white', borderRadius: 14, padding: '16px 20px', border: '1px solid #f1f5f9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                 <Icon style={{ width: 18, height: 18, color }} />
@@ -112,9 +192,8 @@ export default function Admin({ navigate }: Props) {
           ))}
         </div>
 
-        {/* Tab content */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {adminNav.map(({ id, icon: Icon, label }) => (
+          {navItems.map(({ id, icon: Icon, label }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -134,41 +213,71 @@ export default function Admin({ navigate }: Props) {
           <div style={{ background: 'white', borderRadius: 16, border: '1px solid #f1f5f9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
             <div style={{ padding: '18px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
               <BookOpen style={{ width: 16, height: 16, color: '#16a34a' }} />
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Rulebooks de evaluación</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Rulebooks de evaluacion</div>
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Datos reales de GET /rulebooks</div>
+              </div>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                 <div style={{ position: 'relative' }}>
                   <Search style={{ width: 14, height: 14, color: '#94a3b8', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
-                  <input placeholder="Buscar cultivo..." style={{ paddingLeft: 32, padding: '7px 12px 7px 32px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', width: 180 }} />
+                  <input
+                    placeholder="Buscar cultivo..."
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    style={{ paddingLeft: 32, padding: '7px 12px 7px 32px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', width: 180 }}
+                  />
                 </div>
                 <button style={{ background: '#16a34a', color: 'white', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Plus style={{ width: 13, height: 13 }} /> Cargar rulebook
                 </button>
               </div>
             </div>
+
+            {rulebookError && (
+              <div style={{ margin: 16, background: '#fee2e2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 10, padding: '12px 14px', fontSize: 13 }}>
+                {rulebookError}
+              </div>
+            )}
+
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#fafafa' }}>
-                  {['Cultivo', 'Versión', 'N° criterios', 'Estado', 'Última actualización', 'Acciones'].map(h => (
+                  {['Cultivo', 'Version', 'Criterios', 'Estado', 'ID backend', 'Acciones'].map(h => (
                     <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11.5, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {rulebooks.map((rb, i) => (
-                  <tr key={i} style={{ borderTop: '1px solid #f8fafc' }}>
-                    <td style={{ padding: '13px 16px', fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{rb.cultivo}</td>
-                    <td style={{ padding: '13px 16px' }}><code style={{ background: '#f8fafc', padding: '3px 8px', borderRadius: 6, fontSize: 12.5, color: '#475569', fontFamily: 'monospace' }}>{rb.version}</code></td>
-                    <td style={{ padding: '13px 16px', fontSize: 13.5, color: '#475569', fontWeight: 600 }}>{rb.criterios} criterios</td>
-                    <td style={{ padding: '13px 16px' }}><div style={{ background: rb.estadoBg, color: rb.estadoColor, fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 20, display: 'inline-block' }}>{rb.estado}</div></td>
-                    <td style={{ padding: '13px 16px', fontSize: 13, color: '#64748b' }}>{rb.updated}</td>
-                    <td style={{ padding: '13px 16px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontSize: 12, color: '#475569' }}>Editar</button>
-                        <button style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontSize: 12, color: '#16a34a' }}>Ver</button>
-                      </div>
-                    </td>
+                {loadingRulebooks && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: 18, fontSize: 13, color: '#64748b' }}>Consultando rulebooks...</td>
                   </tr>
-                ))}
+                )}
+
+                {!loadingRulebooks && filteredRulebooks.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: 18, fontSize: 13, color: '#64748b' }}>No hay rulebooks para mostrar.</td>
+                  </tr>
+                )}
+
+                {!loadingRulebooks && filteredRulebooks.map((rulebook) => {
+                  const status = getStatusStyle(rulebook.status);
+                  return (
+                    <tr key={rulebook.id} style={{ borderTop: '1px solid #f8fafc' }}>
+                      <td style={{ padding: '13px 16px', fontSize: 14, fontWeight: 600, color: '#0f172a', textTransform: 'capitalize' }}>{cropLabel(rulebook.cropId)}</td>
+                      <td style={{ padding: '13px 16px' }}><code style={{ background: '#f8fafc', padding: '3px 8px', borderRadius: 6, fontSize: 12.5, color: '#475569', fontFamily: 'monospace' }}>v{rulebook.version}</code></td>
+                      <td style={{ padding: '13px 16px', fontSize: 13.5, color: '#64748b' }}>No expuesto por API</td>
+                      <td style={{ padding: '13px 16px' }}><div style={{ background: status.bg, color: status.color, fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 20, display: 'inline-block' }}>{status.label}</div></td>
+                      <td style={{ padding: '13px 16px' }}><code style={{ fontSize: 12, color: '#64748b' }}>{rulebook.id.slice(0, 8)}</code></td>
+                      <td style={{ padding: '13px 16px' }}>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontSize: 12, color: '#475569' }}>Editar</button>
+                          <button style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontSize: 12, color: '#16a34a' }}>Ver</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -178,7 +287,10 @@ export default function Admin({ navigate }: Props) {
           <div style={{ background: 'white', borderRadius: 16, border: '1px solid #f1f5f9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
             <div style={{ padding: '18px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
               <FileText style={{ width: 16, height: 16, color: '#0891b2' }} />
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Documentos de base de conocimiento RAG</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Documentos de base de conocimiento RAG</div>
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Mock temporal hasta conectar Document Management</div>
+              </div>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                 <button style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13, color: '#475569', display: 'flex', alignItems: 'center', gap: 5 }}>
                   <Filter style={{ width: 13, height: 13 }} /> Filtrar
@@ -191,14 +303,14 @@ export default function Admin({ navigate }: Props) {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#fafafa' }}>
-                  {['Nombre del documento', 'Fuente', 'Estado de indexación', 'Fragmentos generados', 'Actualizado', ''].map(h => (
+                  {['Nombre del documento', 'Fuente', 'Estado de indexacion', 'Fragmentos generados', 'Actualizado', ''].map(h => (
                     <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11.5, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {ragDocs.map((doc, i) => (
-                  <tr key={i} style={{ borderTop: '1px solid #f8fafc' }}>
+                {ragDocs.map((doc) => (
+                  <tr key={doc.name} style={{ borderTop: '1px solid #f8fafc' }}>
                     <td style={{ padding: '13px 16px', maxWidth: 280 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 600, color: '#0f172a' }}>{doc.name}</div>
                     </td>
@@ -210,18 +322,11 @@ export default function Admin({ navigate }: Props) {
                       </div>
                     </td>
                     <td style={{ padding: '13px 16px', fontSize: 13.5, fontWeight: 700, color: doc.fragmentos > 0 ? '#0891b2' : '#94a3b8' }}>
-                      {doc.fragmentos > 0 ? `${doc.fragmentos} frags.` : '—'}
+                      {doc.fragmentos > 0 ? `${doc.fragmentos} frags.` : '-'}
                     </td>
                     <td style={{ padding: '13px 16px', fontSize: 13, color: '#64748b' }}>{doc.updated}</td>
                     <td style={{ padding: '13px 16px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {doc.estado === 'Error' && (
-                          <button style={{ background: '#fee2e2', border: 'none', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontSize: 12, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <RefreshCw style={{ width: 11, height: 11 }} /> Reintentar
-                          </button>
-                        )}
-                        <button style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontSize: 12, color: '#475569' }}>Ver</button>
-                      </div>
+                      <button style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontSize: 12, color: '#475569' }}>Ver</button>
                     </td>
                   </tr>
                 ))}
@@ -236,10 +341,10 @@ export default function Admin({ navigate }: Props) {
               {activeTab === 'validations' ? <CheckCircle2 style={{ width: 28, height: 28, color: '#94a3b8' }} /> : <Settings style={{ width: 28, height: 28, color: '#94a3b8' }} />}
             </div>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>
-              {activeTab === 'validations' ? 'Panel de validaciones' : 'Configuración del sistema'}
+              {activeTab === 'validations' ? 'Panel de validaciones' : 'Configuracion del sistema'}
             </div>
             <div style={{ fontSize: 14, color: '#64748b' }}>
-              {activeTab === 'validations' ? '3 evaluaciones pendientes de validación por el equipo técnico.' : 'Parámetros de configuración del motor MCDA y modelos LLM.'}
+              {activeTab === 'validations' ? 'Vista mock hasta conectar validaciones reales.' : 'Vista mock hasta conectar parametros reales del sistema.'}
             </div>
           </div>
         )}
