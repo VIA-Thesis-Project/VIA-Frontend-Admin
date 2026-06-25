@@ -45,8 +45,32 @@ npm run build
 El proxy de Vite esta configurado asi:
 
 ```text
-/api -> http://127.0.0.1:8000
+/api -> https://via-api-j4r1.onrender.com
 ```
+
+En desarrollo local, Vite reenvia `/api` al backend desplegado en Render para evitar CORS.
+
+## Deploy en Vercel
+
+Este frontend esta preparado para desplegarse como Vite Static Site en Vercel.
+
+Configuracion recomendada:
+
+```text
+Framework Preset: Vite
+Build Command: npm run build
+Output Directory: dist
+Install Command: npm install
+```
+
+`vercel.json` define:
+
+```text
+/api/* -> https://via-api-j4r1.onrender.com/*
+/*     -> /index.html
+```
+
+Esto mantiene al frontend consumiendo `/api` en produccion y evita depender de CORS del backend. No se requiere configurar `VITE_API_BASE_URL` en Vercel mientras se mantenga el valor por defecto `/api`.
 
 ## Estado actual
 
