@@ -5,4 +5,7 @@ export type RulebookSummary = {
   cropId: string;
   version: number;
   status: RulebookStatus;
+  criteriaCount?: number;
+  phasesCount?: number;
+  requirementsCount?: number;
 };

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Leaf, Eye, EyeOff, Shield, Users, Lock } from 'lucide-react';
+import { Eye, EyeOff, Shield, Users, Lock } from 'lucide-react';
 import { NavigateFn } from '@/app/navigation/navigation';
 import { authenticateUser } from '@/features/auth/application/authenticateUser';
 import { AuthApiRepository } from '@/features/auth/infrastructure/api/authApiRepository';
 import { saveAuthSession } from '@/features/auth/infrastructure/session/authSessionStorage';
+import { ViaMark } from '@/shared/presentation/components/ViaMark';
 
 interface Props { navigate: NavigateFn; }
 
@@ -50,10 +51,10 @@ export default function Login({ navigate }: Props) {
         <div style={{ background: 'white', borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
           {/* Header strip */}
           <div style={{ background: 'linear-gradient(135deg, #15803d, #0891b2)', padding: '28px 32px', textAlign: 'center' }}>
-            <div style={{ width: 52, height: 52, background: 'rgba(255,255,255,0.2)', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-              <Leaf style={{ width: 28, height: 28, color: 'white' }} />
+            <div style={{ width: 56, height: 56, background: 'rgba(255,255,255,0.18)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <ViaMark size={48} />
             </div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: 'white', marginBottom: 4 }}>AgroViabilidad DSS</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: 'white', marginBottom: 4 }}>VIA Admin</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>Sistema de apoyo a decisiones agrícolas</div>
           </div>
 
@@ -131,21 +132,6 @@ export default function Login({ navigate }: Props) {
                   Ingresar al sistema
                 </>
               )}
-            </button>
-
-            <div style={{ position: 'relative', margin: '20px 0', textAlign: 'center' }}>
-              <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: '#f1f5f9' }} />
-              <span style={{ position: 'relative', background: 'white', padding: '0 12px', fontSize: 12, color: '#94a3b8' }}>o</span>
-            </div>
-
-            <button
-              onClick={() => navigate('admin')}
-              style={{
-                width: '100%', background: '#f8fafc', color: '#475569', border: '1.5px solid #e2e8f0',
-                padding: '12px', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              Continuar como demo
             </button>
 
             <div style={{ marginTop: 24, padding: 14, background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0' }}>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   BookOpen,
@@ -19,6 +19,7 @@ import { RulebookSummary } from '@/features/admin/domain/rulebook';
 import { adminNav, ragDocs } from '@/features/admin/infrastructure/mock/adminData';
 import { RulebookApiRepository } from '@/features/admin/infrastructure/api/rulebookApiRepository';
 import { readAuthSession } from '@/features/auth/infrastructure/session/authSessionStorage';
+import { ViaMark } from '@/shared/presentation/components/ViaMark';
 
 interface Props { navigate: NavigateFn; }
 
@@ -43,7 +44,10 @@ export default function Admin({ navigate }: Props) {
   const [rulebooks, setRulebooks] = useState<RulebookSummary[]>([]);
   const [search, setSearch] = useState('');
   const [loadingRulebooks, setLoadingRulebooks] = useState(true);
+  const [uploadingRulebook, setUploadingRulebook] = useState(false);
   const [rulebookError, setRulebookError] = useState<string | null>(null);
+  const [rulebookNotice, setRulebookNotice] = useState<string | null>(null);
+  const rulebookFileInputRef = useRef<HTMLInputElement>(null);
 
   const loadRulebooks = async () => {
     const session = readAuthSession();
@@ -70,6 +74,41 @@ export default function Admin({ navigate }: Props) {
     void loadRulebooks();
   }, []);
 
+  const handleRulebookJsonUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const session = readAuthSession();
+    if (!session) {
+      setRulebookError('Inicia sesion como administrador para crear rulebooks.');
+      event.target.value = '';
+      return;
+    }
+
+    setUploadingRulebook(true);
+    setRulebookError(null);
+    setRulebookNotice(null);
+
+    try {
+      const rawContent = await file.text();
+      const payload = JSON.parse(rawContent) as unknown;
+      const created = await rulebookRepository.createRulebook(session.accessToken, payload);
+
+      setRulebooks((currentRulebooks) => [created, ...currentRulebooks]);
+      setActiveTab('rulebooks');
+      setRulebookNotice(`Rulebook ${cropLabel(created.cropId)} v${created.version} registrado como ${created.status}.`);
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        setRulebookError('El archivo seleccionado no contiene JSON valido.');
+      } else {
+        setRulebookError(err instanceof Error ? err.message : 'No se pudo crear el rulebook desde el archivo JSON.');
+      }
+    } finally {
+      setUploadingRulebook(false);
+      event.target.value = '';
+    }
+  };
+
   const filteredRulebooks = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return rulebooks;
@@ -88,9 +127,9 @@ export default function Admin({ navigate }: Props) {
 
   const stats = [
     { icon: BookOpen, label: 'Rulebooks registrados', value: String(rulebooks.length), sub: `${activeRulebooks} activos, ${draftRulebooks} borradores`, color: '#16a34a', bg: '#f0fdf4', iconBg: '#dcfce7' },
-    { icon: FileText, label: 'Documentos indexados', value: '4', sub: 'mock hasta conectar documentos', color: '#0891b2', bg: '#ecfeff', iconBg: '#cffafe' },
-    { icon: Database, label: 'Fragmentos RAG', value: '365', sub: 'mock hasta conectar RAG', color: '#7c3aed', bg: '#faf5ff', iconBg: '#ede9fe' },
-    { icon: CheckCircle2, label: 'Validaciones pendientes', value: '3', sub: 'mock de panel tecnico', color: '#d97706', bg: '#fffbeb', iconBg: '#fef3c7' },
+    { icon: FileText, label: 'Documentos indexados', value: '-', sub: 'Sin listado publico en backend', color: '#0891b2', bg: '#ecfeff', iconBg: '#cffafe' },
+    { icon: Database, label: 'Fragmentos RAG', value: '-', sub: 'Busqueda disponible, Render responde 500', color: '#7c3aed', bg: '#faf5ff', iconBg: '#ede9fe' },
+    { icon: CheckCircle2, label: 'Validaciones pendientes', value: '-', sub: 'Sin endpoint administrativo', color: '#d97706', bg: '#fffbeb', iconBg: '#fef3c7' },
   ];
 
   return (
@@ -98,12 +137,10 @@ export default function Admin({ navigate }: Props) {
       <aside style={{ width: 240, background: '#0f172a', minHeight: '100vh', position: 'fixed', left: 0, top: 0, zIndex: 40, display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 36, height: 36, background: 'linear-gradient(135deg, #16a34a, #0891b2)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Shield style={{ width: 18, height: 18, color: 'white' }} />
-            </div>
+            <ViaMark size={36} />
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>Panel tecnico</div>
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>AgroViabilidad DSS</div>
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>VIA</div>
             </div>
           </div>
           <div style={{ marginTop: 12, background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 8, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -163,7 +200,7 @@ export default function Admin({ navigate }: Props) {
               <Shield style={{ width: 12, height: 12 }} /> Acceso restringido al equipo tecnico
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: 0, marginBottom: 4 }}>Panel de administracion tecnica</h1>
-            <p style={{ fontSize: 13.5, color: '#64748b', margin: 0 }}>Rulebooks conectados a backend. Documentos RAG y validaciones siguen como mock temporal.</p>
+            <p style={{ fontSize: 13.5, color: '#64748b', margin: 0 }}>Rulebooks conectados a Render. Documentos RAG y validaciones siguen pendientes de endpoints estables.</p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button
@@ -173,9 +210,13 @@ export default function Admin({ navigate }: Props) {
             >
               <RefreshCw style={{ width: 14, height: 14 }} /> Sincronizar
             </button>
-            <button style={{ background: '#16a34a', color: 'white', border: 'none', padding: '9px 16px', borderRadius: 9, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
-              <Upload style={{ width: 14, height: 14 }} /> Cargar archivo
-            </button>
+            <input
+              ref={rulebookFileInputRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={(event) => void handleRulebookJsonUpload(event)}
+              style={{ display: 'none' }}
+            />
           </div>
         </div>
 
@@ -227,8 +268,12 @@ export default function Admin({ navigate }: Props) {
                     style={{ paddingLeft: 32, padding: '7px 12px 7px 32px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', width: 180 }}
                   />
                 </div>
-                <button style={{ background: '#16a34a', color: 'white', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Plus style={{ width: 13, height: 13 }} /> Cargar rulebook
+                <button
+                  onClick={() => rulebookFileInputRef.current?.click()}
+                  disabled={uploadingRulebook}
+                  style={{ background: uploadingRulebook ? '#86efac' : '#16a34a', color: 'white', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: uploadingRulebook ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Plus style={{ width: 13, height: 13 }} /> {uploadingRulebook ? 'Cargando...' : 'Cargar JSON'}
                 </button>
               </div>
             </div>
@@ -239,10 +284,16 @@ export default function Admin({ navigate }: Props) {
               </div>
             )}
 
+            {rulebookNotice && (
+              <div style={{ margin: 16, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', borderRadius: 10, padding: '12px 14px', fontSize: 13 }}>
+                {rulebookNotice}
+              </div>
+            )}
+
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#fafafa' }}>
-                  {['Cultivo', 'Version', 'Criterios', 'Estado', 'ID backend', 'Acciones'].map(h => (
+                  {['Cultivo', 'Version', 'Detalle activo', 'Estado', 'ID backend', 'Acciones'].map(h => (
                     <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11.5, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                   ))}
                 </tr>
@@ -266,7 +317,11 @@ export default function Admin({ navigate }: Props) {
                     <tr key={rulebook.id} style={{ borderTop: '1px solid #f8fafc' }}>
                       <td style={{ padding: '13px 16px', fontSize: 14, fontWeight: 600, color: '#0f172a', textTransform: 'capitalize' }}>{cropLabel(rulebook.cropId)}</td>
                       <td style={{ padding: '13px 16px' }}><code style={{ background: '#f8fafc', padding: '3px 8px', borderRadius: 6, fontSize: 12.5, color: '#475569', fontFamily: 'monospace' }}>v{rulebook.version}</code></td>
-                      <td style={{ padding: '13px 16px', fontSize: 13.5, color: '#64748b' }}>No expuesto por API</td>
+                      <td style={{ padding: '13px 16px', fontSize: 13.5, color: '#64748b' }}>
+                        {rulebook.criteriaCount !== undefined
+                          ? `${rulebook.criteriaCount} criterios · ${rulebook.phasesCount ?? 0} fases · ${rulebook.requirementsCount ?? 0} reglas`
+                          : 'Detalle no disponible'}
+                      </td>
                       <td style={{ padding: '13px 16px' }}><div style={{ background: status.bg, color: status.color, fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 20, display: 'inline-block' }}>{status.label}</div></td>
                       <td style={{ padding: '13px 16px' }}><code style={{ fontSize: 12, color: '#64748b' }}>{rulebook.id.slice(0, 8)}</code></td>
                       <td style={{ padding: '13px 16px' }}>
